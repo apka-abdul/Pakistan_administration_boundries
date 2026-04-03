@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>M26_M29_M41</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --primary:#2b4bb9;--primary-light:#3a5fd4;
+      --primary-dim:rgba(43,75,185,.10);--primary-glow:rgba(43,75,185,.18);
+      --teal:#006058;--teal-light:#00796b;--teal-dim:rgba(0,96,88,.10);
+      --gray:#515f74;--gray-dim:rgba(81,95,116,.10);
+      --bg:#f0f4fa;--bg2:#e8edf6;
+      --panel:rgba(255,255,255,.82);--panel2:rgba(255,255,255,.60);
+      --border:#c3c6d7;--border-light:rgba(195,198,215,.5);
+      --text:#1a2340;--text2:#3c4a63;--muted:#6b7b96;
+      --shadow-sm:0 2px 8px rgba(43,75,185,.07);
+      --shadow-md:0 4px 20px rgba(43,75,185,.10);
+      --shadow-lg:0 8px 40px rgba(43,75,185,.13);
+      --amber:#b45309;--amber-dim:rgba(180,83,9,.10);
+      --red:#c0392b;--red-dim:rgba(192,57,43,.10);
+      --radius:12px;--radius-sm:8px;--blur:blur(16px);
+    }
+    html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+    body::before{
+      content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background-image:linear-gradient(rgba(43,75,185,.035) 1px,transparent 1px),
+                       linear-gradient(90deg,rgba(43,75,185,.035) 1px,transparent 1px);
+      background-size:32px 32px;
+    }
+
+    /* HEADER */
+    header{
+      position:fixed;top:0;left:0;right:0;z-index:1100;height:56px;
+      background:rgba(255,255,255,.88);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+      border-bottom:1px solid var(--border-light);box-shadow:var(--shadow-sm);
+      display:flex;align-items:center;gap:12px;padding:0 20px;
+    }
+    .hdr-logo{
+      width:34px;height:34px;background:linear-gradient(135deg,var(--primary),var(--primary-light));
+      border-radius:9px;display:flex;align-items:center;justify-content:center;
+      font-size:17px;box-shadow:0 2px 10px rgba(43,75,185,.30);flex-shrink:0;
+    }
+    header h1{font-family:'Manrope',sans-serif;font-size:16px;font-weight:800;color:var(--primary);letter-spacing:-.3px}
+    .hdr-coords{
+      font-size:11px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums;
+      background:var(--primary-dim);border:1px solid var(--border-light);border-radius:20px;padding:4px 12px;
+    }
+    .badge{
+      display:flex;align-items:center;gap:5px;background:var(--teal-dim);
+      border:1px solid rgba(0,96,88,.25);border-radius:20px;padding:4px 10px;
+      font-size:11px;font-weight:600;color:var(--teal);margin-left:8px;
+    }
+    .badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--teal);animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+    /* LAYOUT */
+    .app{display:flex;height:calc(100vh - 56px);margin-top:56px;position:relative;z-index:1}
+
+    /* SIDEBAR */
+    aside{
+      width:290px;flex-shrink:0;
+      background:rgba(240,244,250,.70);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+      border-right:1px solid var(--border-light);overflow-y:auto;
+      padding:16px 14px;display:flex;flex-direction:column;gap:14px;
+      box-shadow:4px 0 24px rgba(43,75,185,.06);
+    }
+    aside::-webkit-scrollbar{width:3px}
+    aside::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .sec-lbl{
+      font-family:'Manrope',sans-serif;font-size:10px;font-weight:700;
+      letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;
+      padding-bottom:8px;border-bottom:1px solid var(--border-light);
+    }
+
+    /* STATS */
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .stat{
+      background:var(--panel);backdrop-filter:var(--blur);
+      border:1px solid var(--border-light);border-radius:var(--radius-sm);
+      padding:11px 12px;box-shadow:var(--shadow-sm);
+      transition:box-shadow .2s,transform .2s;
+    }
+    .stat:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+    .stat-n{font-family:'Manrope',sans-serif;font-size:22px;font-weight:800;line-height:1}
+    .stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;font-weight:500}
+
+    /* CARDS */
+    .card{
+      background:var(--panel);backdrop-filter:var(--blur);
+      border:1px solid var(--border-light);border-radius:var(--radius);
+      padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-sm);
+    }
+    .f-label{
+      font-size:10px;font-weight:700;font-family:'Manrope',sans-serif;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.7px;
+      display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;
+    }
+    .f-label-inner{display:flex;align-items:center;gap:6px}
+    .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+    select{
+      width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+      border-radius:var(--radius-sm);padding:8px 28px 8px 10px;font-size:12px;
+      font-family:'Inter',sans-serif;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7b96' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 9px center;
+      transition:border-color .15s,box-shadow .15s;
+    }
+    select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-glow)}
+    select:disabled{opacity:.4;cursor:not-allowed}
+
+    .btn{
+      width:100%;border-radius:var(--radius-sm);padding:8px;font-size:12px;font-weight:600;
+      font-family:'Manrope',sans-serif;cursor:pointer;transition:all .15s;
+      display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:.2px;
+    }
+    .btn-blue{background:var(--primary-dim);border:1px solid rgba(43,75,185,.25);color:var(--primary)}
+    .btn-blue:hover{background:var(--primary-glow);box-shadow:0 2px 10px rgba(43,75,185,.18)}
+    .btn-red{background:var(--red-dim);border:1px solid rgba(192,57,43,.22);color:var(--red)}
+    .btn-red:hover{background:rgba(192,57,43,.18);box-shadow:0 2px 10px rgba(192,57,43,.14)}
+    .btn-teal{background:var(--teal-dim);border:1px solid rgba(0,96,88,.25);color:var(--teal)}
+    .btn-teal:hover{background:rgba(0,96,88,.18);box-shadow:0 2px 10px rgba(0,96,88,.14)}
+    .btn-teal:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
+
+    /* LAYERS */
+    .layer-row{
+      display:flex;align-items:center;gap:9px;padding:7px 4px;
+      border-bottom:1px solid var(--border-light);cursor:pointer;
+      border-radius:6px;transition:background .15s;
+    }
+    .layer-row:hover{background:var(--primary-dim)}
+    .layer-row:last-child{border-bottom:none;padding-bottom:0}
+    .swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+    .layer-name{font-size:12px;font-weight:500;flex:1}
+    .layer-ct{font-size:11px;color:var(--muted)}
+    .toggle{width:32px;height:17px;background:var(--border);border-radius:9px;position:relative;transition:background .2s;flex-shrink:0}
+    .toggle.on{background:var(--primary)}
+    .toggle::after{
+      content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;
+      border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:transform .2s;
+    }
+    .toggle.on::after{transform:translateX(15px)}
+
+    /* LEGEND */
+    .leg-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;font-weight:500;color:var(--text2)}
+    .leg-sw{width:26px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.10)}
+
+    /* INFO BOX */
+    .info-box{
+      background:var(--panel2);border:1px solid var(--border-light);
+      border-radius:var(--radius);padding:12px;min-height:72px;box-shadow:var(--shadow-sm);
+    }
+    .info-empty{color:var(--muted);font-size:11px;font-style:italic;line-height:1.5}
+    .irow{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid var(--border-light)}
+    .irow:last-child{border-bottom:none}
+    .ik{color:var(--muted);font-weight:500}
+    .iv{font-weight:600;max-width:160px;text-align:right;word-break:break-word;color:var(--primary)}
+
+    /* DRAW BOX */
+    .draw-box{
+      background:var(--panel);border:1px solid var(--border-light);
+      border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);
+      display:flex;flex-direction:column;gap:7px;
+    }
+    .draw-n{font-family:'Manrope',sans-serif;font-size:26px;font-weight:800;color:var(--primary);line-height:1}
+    .draw-sub{font-size:10px;color:var(--muted);font-weight:500;margin-bottom:3px}
+
+    /* NOTICE */
+    .notice{
+      background:var(--amber-dim);border:1px solid rgba(180,83,9,.22);
+      border-radius:var(--radius-sm);padding:9px 11px;font-size:11px;color:var(--amber);line-height:1.5;font-weight:500;
+    }
+
+    /* TEXT INPUT */
+    .txt-input{
+      width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+      border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;
+      font-family:'Inter',sans-serif;transition:border-color .15s,box-shadow .15s;
+    }
+    .txt-input::placeholder{color:var(--muted)}
+    .txt-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-glow)}
+
+    /* COLOR + ROW */
+    .style-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .style-col{display:flex;flex-direction:column;gap:4px}
+    .color-wrap{
+      position:relative;width:100%;height:34px;border-radius:var(--radius-sm);
+      border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:box-shadow .15s;
+    }
+    .color-wrap:hover{box-shadow:0 0 0 2px var(--primary-glow)}
+    .color-input{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);border:none;cursor:pointer;padding:0;background:none}
+
+    /* RANGE */
+    .range-row{display:flex;align-items:center;gap:8px}
+    .range-val{font-size:11px;font-weight:700;color:var(--primary);min-width:30px;text-align:right;font-family:'Manrope',sans-serif}
+    .range-input{flex:1;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--border);cursor:pointer}
+    .range-input::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--primary);box-shadow:0 1px 4px rgba(43,75,185,.35);cursor:pointer;transition:transform .15s}
+    .range-input::-webkit-slider-thumb:hover{transform:scale(1.25)}
+    .range-input:focus{outline:none}
+
+    /* DASH BUTTONS */
+    .dash-opts{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+    .dash-btn{background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:5px 0;cursor:pointer;transition:all .15s;letter-spacing:1px}
+    .dash-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .dash-btn.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary);font-weight:700}
+
+    /* EDIT MODAL */
+    #editModal{
+      position:fixed;bottom:28px;right:20px;z-index:2000;width:272px;
+      background:rgba(255,255,255,.97);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+      border:1px solid var(--border-light);border-radius:var(--radius);
+      box-shadow:var(--shadow-lg);padding:14px;
+      display:none;flex-direction:column;gap:10px;animation:slideUp .2s ease;
+    }
+    #editModal.open{display:flex}
+    @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .em-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid var(--border-light)}
+    .em-title{font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;color:var(--primary)}
+    .em-close{
+      background:var(--gray-dim);border:1px solid var(--border-light);border-radius:6px;
+      color:var(--muted);font-size:12px;width:24px;height:24px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;transition:background .15s;
+    }
+    .em-close:hover{background:var(--red-dim);color:var(--red)}
+    .em-sub{font-size:10px;color:var(--muted);font-style:italic;text-align:center}
+
+    /* POPUP RICH ROWS */
+    .pu-swatch-row{display:flex;align-items:center;gap:7px;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border-light)}
+    .pu-swatch-row:last-child{border-bottom:none}
+    .pu-sw{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.12);flex-shrink:0}
+    .pu-sw-k{color:var(--muted);flex:1}
+    .pu-sw-v{font-weight:700}
+
+    /* MAP */
+    #map{flex:1;background:#dce8f0}
+
+    /* LEAFLET OVERRIDES */
+    .leaflet-control-zoom{border:1px solid var(--border)!important;border-radius:var(--radius-sm)!important;box-shadow:var(--shadow-md)!important;overflow:hidden}
+    .leaflet-control-zoom a{background:var(--panel)!important;color:var(--primary)!important;border-color:var(--border)!important;font-weight:700!important}
+    .leaflet-control-zoom a:hover{background:var(--primary-dim)!important}
+    .leaflet-control-attribution{background:rgba(240,244,250,.85)!important;color:var(--muted)!important;font-size:10px;backdrop-filter:blur(8px)}
+    .leaflet-control-attribution a{color:var(--primary)!important}
+    .leaflet-popup-content-wrapper{background:rgba(255,255,255,.96)!important;color:var(--text)!important;border:1px solid var(--border-light)!important;border-radius:var(--radius)!important;box-shadow:var(--shadow-lg)!important;backdrop-filter:var(--blur)!important}
+    .leaflet-popup-tip{background:rgba(255,255,255,.96)!important}
+    .leaflet-popup-content{margin:14px 16px!important;font-family:'Inter',sans-serif!important}
+    .pu-title{font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;color:var(--primary);margin-bottom:9px;letter-spacing:-.2px}
+    .pu-row{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border-light)}
+    .pu-row:last-child{border-bottom:none}
+    .pu-k{color:var(--muted);font-weight:500}
+    .pu-v{font-weight:700;color:var(--text)}
+    .leaflet-draw-toolbar a{background-color:var(--panel)!important;border-color:var(--border)!important;color:var(--primary)!important}
+    .leaflet-draw-toolbar a:hover{background-color:var(--primary-dim)!important}
+    .leaflet-draw-actions a{background:var(--panel)!important;color:var(--text)!important}
+    .leaflet-draw.leaflet-control{border-radius:var(--radius-sm)!important;overflow:hidden;box-shadow:var(--shadow-md)!important}
+
+    /* TOAST */
+    #toast{
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(12px);
+      background:var(--panel);border:1px solid var(--border-light);border-radius:30px;
+      padding:9px 18px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;
+      color:var(--text);box-shadow:var(--shadow-lg);backdrop-filter:var(--blur);
+      display:flex;align-items:center;gap:7px;z-index:9999;
+      opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+    }
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-logo">🗺️</div>
+  <h1>M26_M29_M41</h1>
+  <span class="hdr-coords" id="coords">Move cursor over map</span>
+  <div class="badge">Live</div>
+</header>
+
+<div class="app">
+  <aside>
+
+    <p class="sec-lbl">Overview</p>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" style="color:var(--primary)">7</div><div class="stat-lbl">Provinces</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--teal)" id="sDistrict">126</div><div class="stat-lbl">Districts</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--amber)" id="sTehsil">—</div><div class="stat-lbl">Tehsils</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--gray)" id="sVisible">133</div><div class="stat-lbl">Visible</div></div>
+    </div>
+
+    <p class="sec-lbl">Spatial Filters</p>
+    <div class="card">
+      <div>
+        <div class="f-label"><span class="f-label-inner"><span class="dot" style="background:var(--primary)"></span>Province</span></div>
+        <select id="selProvince"><option value="">— All Provinces —</option></select>
+      </div>
+      <div>
+        <div class="f-label"><span class="f-label-inner"><span class="dot" style="background:var(--teal)"></span>District</span></div>
+        <select id="selDistrict" disabled><option value="">— Select a Province first —</option></select>
+      </div>
+      <div>
+        <div class="f-label"><span class="f-label-inner"><span class="dot" style="background:var(--amber)"></span>Tehsil</span></div>
+        <select id="selTehsil" disabled><option value="">— Select a District first —</option></select>
+      </div>
+      <button class="btn btn-blue" onclick="resetAll()">↺ Reset Filters</button>
+    </div>
+
+    <div class="notice" id="tehsilNotice" style="display:none">
+      ℹ️ Tehsils load only when a District is selected (554 features — loads on demand to keep map fast).
+    </div>
+
+    <p class="sec-lbl">Layer Visibility</p>
+    <div class="card">
+      <div class="layer-row" onclick="toggleVis('province')">
+        <div class="swatch" style="background:var(--primary)"></div>
+        <span class="layer-name">Provinces</span><span class="layer-ct">7</span>
+        <div class="toggle on" id="lt-province"></div>
+      </div>
+      <div class="layer-row" onclick="toggleVis('district')">
+        <div class="swatch" style="background:var(--teal)"></div>
+        <span class="layer-name">Districts</span><span class="layer-ct" id="lt-dct">126</span>
+        <div class="toggle on" id="lt-district"></div>
+      </div>
+      <div class="layer-row" onclick="toggleVis('tehsil')">
+        <div class="swatch" style="background:var(--amber)"></div>
+        <span class="layer-name">Tehsils</span><span class="layer-ct" id="lt-tct">0</span>
+        <div class="toggle" id="lt-tehsil"></div>
+      </div>
+    </div>
+
+    <p class="sec-lbl">Legend</p>
+    <div class="card">
+      <div class="leg-item"><div class="leg-sw" style="background:rgba(43,75,185,.22);border-color:rgba(43,75,185,.35)"></div>Province</div>
+      <div class="leg-item"><div class="leg-sw" style="background:rgba(0,96,88,.18);border-color:rgba(0,96,88,.35)"></div>District</div>
+      <div class="leg-item"><div class="leg-sw" style="background:rgba(180,83,9,.18);border-color:rgba(180,83,9,.35)"></div>Tehsil</div>
+      <div class="leg-item"><div class="leg-sw" style="background:rgba(93,56,200,.28);border-color:rgba(93,56,200,.50)"></div>Highlighted</div>
+      <div class="leg-item"><div class="leg-sw" style="background:rgba(192,57,43,.22);border-color:rgba(192,57,43,.45)"></div>Drawn shape</div>
+    </div>
+
+    <p class="sec-lbl">Feature Info</p>
+    <div class="info-box" id="infoBox">
+      <p class="info-empty">Click any region on the map to inspect its properties.</p>
+    </div>
+
+    <!-- ── SHAPE STYLE ───────────────────────────────── -->
+    <p class="sec-lbl">Shape Style</p>
+    <div class="card">
+      <div>
+        <div class="f-label"><span class="f-label-inner">Label / Name</span></div>
+        <input type="text" id="dsName" class="txt-input" placeholder="e.g. Study Area, Region 1…"/>
+      </div>
+      <div class="style-row">
+        <div class="style-col">
+          <div class="f-label"><span class="f-label-inner">Stroke</span></div>
+          <div class="color-wrap"><input type="color" id="dsStroke" class="color-input" value="#c0392b"/></div>
+        </div>
+        <div class="style-col">
+          <div class="f-label"><span class="f-label-inner">Fill</span></div>
+          <div class="color-wrap"><input type="color" id="dsFill" class="color-input" value="#c0392b"/></div>
+        </div>
+      </div>
+      <div>
+        <div class="f-label">
+          <span class="f-label-inner">Fill Opacity</span>
+          <span class="range-val" id="dsFillOpVal">35%</span>
+        </div>
+        <div class="range-row">
+          <input type="range" id="dsFillOp" class="range-input" min="0" max="100" value="35"/>
+        </div>
+      </div>
+      <div>
+        <div class="f-label">
+          <span class="f-label-inner">Stroke Width</span>
+          <span class="range-val" id="dsWeightVal">2px</span>
+        </div>
+        <div class="range-row">
+          <input type="range" id="dsWeight" class="range-input" min="1" max="8" value="2"/>
+        </div>
+      </div>
+      <div>
+        <div class="f-label"><span class="f-label-inner">Line Style</span></div>
+        <div class="dash-opts" id="dsDash">
+          <button class="dash-btn active" data-dash="">──</button>
+          <button class="dash-btn" data-dash="8,4">╌╌</button>
+          <button class="dash-btn" data-dash="2,4">···</button>
+          <button class="dash-btn" data-dash="12,4,2,4">─·─</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DRAWING TOOLS ─────────────────────────────── -->
+    <p class="sec-lbl">Drawing Tools</p>
+    <div class="draw-box">
+      <div class="draw-n" id="drawCount">0</div>
+      <div class="draw-sub">shapes drawn on map</div>
+      <button class="btn btn-teal" id="btnDownload" onclick="downloadGeoJSON()" disabled>⬇ Download as GeoJSON</button>
+      <button class="btn btn-red" onclick="clearDrawn()">🗑 Clear All Drawings</button>
+    </div>
+
+  </aside>
+
+  <!-- FLOATING EDIT MODAL -->
+  <div id="editModal">
+    <div class="em-header">
+      <span class="em-title">✏️ Edit Shape</span>
+      <button class="em-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div>
+      <div class="f-label"><span class="f-label-inner">Label / Name</span></div>
+      <input type="text" id="emName" class="txt-input" placeholder="Shape name…"/>
+    </div>
+    <div class="style-row">
+      <div class="style-col">
+        <div class="f-label"><span class="f-label-inner">Stroke</span></div>
+        <div class="color-wrap"><input type="color" id="emStroke" class="color-input" value="#c0392b"/></div>
+      </div>
+      <div class="style-col">
+        <div class="f-label"><span class="f-label-inner">Fill</span></div>
+        <div class="color-wrap"><input type="color" id="emFill" class="color-input" value="#c0392b"/></div>
+      </div>
+    </div>
+    <div>
+      <div class="f-label">
+        <span class="f-label-inner">Fill Opacity</span>
+        <span class="range-val" id="emFillOpVal">35%</span>
+      </div>
+      <div class="range-row">
+        <input type="range" id="emFillOp" class="range-input" min="0" max="100" value="35"/>
+      </div>
+    </div>
+    <div>
+      <div class="f-label">
+        <span class="f-label-inner">Stroke Width</span>
+        <span class="range-val" id="emWeightVal">2px</span>
+      </div>
+      <div class="range-row">
+        <input type="range" id="emWeight" class="range-input" min="1" max="8" value="2"/>
+      </div>
+    </div>
+    <div>
+      <div class="f-label"><span class="f-label-inner">Line Style</span></div>
+      <div class="dash-opts" id="emDash">
+        <button class="dash-btn active" data-dash="">──</button>
+        <button class="dash-btn" data-dash="8,4">╌╌</button>
+        <button class="dash-btn" data-dash="2,4">···</button>
+        <button class="dash-btn" data-dash="12,4,2,4">─·─</button>
+      </div>
+    </div>
+    <button class="btn btn-blue" onclick="applyEdit()">✓ Apply Style</button>
+    <p class="em-sub">Click another shape or close to dismiss</p>
+  </div>
+
+  <div id="toast"></div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="adm1_data.js"></script>
+<script src="adm2_data.js"></script>
+<script src="adm3_data.js"></script>
+<script>
+// ── STATE ────────────────────────────────────────────
+var sel = { province:'', district:'', tehsil:'' };
+var vis = { province:true, district:true, tehsil:false };
+var lProv=null, lDist=null, lTeh=null, drawnItems=null;
+var drawnCount = 0;
+var map;
+var editingLayer = null;   // currently selected drawn layer for edit
+
+// ── DRAW STYLE STATE ─────────────────────────────────
+var drawStyle = {
+  stroke:'#c0392b', fill:'#c0392b',
+  fillOpacity:0.35, weight:2, dash:''
+};
+
+// ── GEO STYLES ───────────────────────────────────────
+function styleProv(){ return {color:'#2b4bb9',fillColor:'rgba(43,75,185,0.12)',weight:2,fillOpacity:1,opacity:1} }
+function styleDist(){ return {color:'#006058',fillColor:'rgba(0,96,88,0.10)',weight:1.2,fillOpacity:1,opacity:1} }
+function styleTeh() { return {color:'#b45309',fillColor:'rgba(180,83,9,0.10)',weight:0.8,fillOpacity:1,opacity:1} }
+function styleHi()  { return {color:'#5d38c8',fillColor:'rgba(93,56,200,0.22)',weight:2.5,fillOpacity:1,opacity:1,dashArray:'6,3'} }
+
+// ── HELPERS: hex → rgba ──────────────────────────────
+function hexToRgba(hex, alpha){
+  var r=parseInt(hex.slice(1,3),16),
+      g=parseInt(hex.slice(3,5),16),
+      b=parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+
+function buildShapeStyle(s){
+  return {
+    color:      s.stroke,
+    fillColor:  hexToRgba(s.fill, s.fillOpacity),
+    weight:     s.weight,
+    fillOpacity:1,
+    opacity:    1,
+    dashArray:  s.dash || null
+  };
+}
+
+// ── BUILD DRAWN POPUP ────────────────────────────────
+function buildDrawnPopup(s, layerType){
+  var label = s.name || (layerType.charAt(0).toUpperCase()+layerType.slice(1));
+  var dashLabel = s.dash===''?'Solid':s.dash==='8,4'?'Dashed':s.dash==='2,4'?'Dotted':'Dash-Dot';
+  return '<div class="pu-title">'+ label +'</div>' +
+    '<div class="pu-swatch-row"><div class="pu-sw" style="background:'+s.stroke+'"></div><span class="pu-sw-k">Stroke</span><span class="pu-sw-v">'+s.stroke+'</span></div>'+
+    '<div class="pu-swatch-row"><div class="pu-sw" style="background:'+s.fill+';opacity:'+s.fillOpacity+'"></div><span class="pu-sw-k">Fill</span><span class="pu-sw-v">'+s.fill+' / '+(Math.round(s.fillOpacity*100))+'%</span></div>'+
+    '<div class="pu-row"><span class="pu-k">Stroke Width</span><span class="pu-v">'+s.weight+'px</span></div>'+
+    '<div class="pu-row"><span class="pu-k">Line Style</span><span class="pu-v">'+dashLabel+'</span></div>'+
+    '<div class="pu-row"><span class="pu-k">Type</span><span class="pu-v">'+layerType.charAt(0).toUpperCase()+layerType.slice(1)+'</span></div>';
+}
+
+// ── POPUP & SIDEBAR (geo layers) ─────────────────────
+function showInfo(props, level, latlng){
+  var rows='';
+  if(props.shapeName) rows+='<div class="pu-row"><span class="pu-k">Name</span><span class="pu-v">'+props.shapeName+'</span></div>';
+  if(props.province)  rows+='<div class="pu-row"><span class="pu-k">Province</span><span class="pu-v">'+props.province+'</span></div>';
+  if(props.district)  rows+='<div class="pu-row"><span class="pu-k">District</span><span class="pu-v">'+props.district+'</span></div>';
+  rows+='<div class="pu-row"><span class="pu-k">Level</span><span class="pu-v">'+level+'</span></div>';
+  L.popup({maxWidth:260}).setLatLng(latlng)
+    .setContent('<div class="pu-title">'+(props.shapeName||'Region')+'</div>'+rows)
+    .openOn(map);
+  var box=document.getElementById('infoBox'), side='';
+  if(props.shapeName) side+='<div class="irow"><span class="ik">Name</span><span class="iv">'+props.shapeName+'</span></div>';
+  if(props.province)  side+='<div class="irow"><span class="ik">Province</span><span class="iv">'+props.province+'</span></div>';
+  if(props.district)  side+='<div class="irow"><span class="ik">District</span><span class="iv">'+props.district+'</span></div>';
+  side+='<div class="irow"><span class="ik">Level</span><span class="iv">'+level+'</span></div>';
+  box.innerHTML=side;
+}
+
+// ── BUILD GEO LAYERS ─────────────────────────────────
+function makeLayer(data, styleFn, level){
+  return L.geoJSON(data,{
+    style:styleFn,
+    onEachFeature:function(feat,layer){
+      layer.on('click',function(e){ L.DomEvent.stopPropagation(e); showInfo(feat.properties,level,e.latlng); });
+      layer.on('mouseover',function(e){ e.target.setStyle({fillColor:'rgba(93,56,200,0.20)',fillOpacity:1}); });
+      layer.on('mouseout', function(e){ e.target.setStyle(styleFn()); });
+    }
+  });
+}
+
+// ── RENDER ───────────────────────────────────────────
+function render(){
+  var p=sel.province, d=sel.district, t=sel.tehsil;
+
+  if(lProv){map.removeLayer(lProv);lProv=null;}
+  lProv=makeLayer(adm1Data,styleProv,'Province');
+  if(vis.province) lProv.addTo(map);
+  if(p) lProv.eachLayer(function(l){if(l.feature.properties.shapeName===p)l.setStyle(styleHi());});
+
+  if(lDist){map.removeLayer(lDist);lDist=null;}
+  var distFeats=p?{type:'FeatureCollection',features:adm2Data.features.filter(function(f){return f.properties.province===p;})}:adm2Data;
+  document.getElementById('sDistrict').textContent=distFeats.features.length;
+  document.getElementById('lt-dct').textContent=distFeats.features.length;
+  lDist=makeLayer(distFeats,styleDist,'District');
+  if(vis.district) lDist.addTo(map);
+  if(d) lDist.eachLayer(function(l){if(l.feature.properties.shapeName===d)l.setStyle(styleHi());});
+
+  if(lTeh){map.removeLayer(lTeh);lTeh=null;}
+  if(d && typeof adm3Data!=='undefined'){
+    var tehFeats=adm3Data.features.filter(function(f){return f.properties.district===d;});
+    if(t) tehFeats=tehFeats.filter(function(f){return f.properties.shapeName===t;});
+    var tehFC={type:'FeatureCollection',features:tehFeats};
+    document.getElementById('sTehsil').textContent=tehFeats.length;
+    document.getElementById('lt-tct').textContent=tehFeats.length;
+    lTeh=makeLayer(tehFC,styleTeh,'Tehsil');
+    lTeh.addTo(map);
+    vis.tehsil=true;
+    document.getElementById('lt-tehsil').classList.add('on');
+  } else {
+    document.getElementById('sTehsil').textContent='—';
+    document.getElementById('lt-tct').textContent='0';
+    vis.tehsil=false;
+    document.getElementById('lt-tehsil').classList.remove('on');
+  }
+
+  if(t && lTeh){
+    try{map.fitBounds(lTeh.getBounds(),{padding:[60,60]});}catch(e){}
+    lTeh.eachLayer(function(l){l.setStyle(styleHi());});
+  } else if(d && lDist){
+    var m=[];lDist.eachLayer(function(l){if(l.feature.properties.shapeName===d)m.push(l);});
+    if(m.length) map.fitBounds(L.featureGroup(m).getBounds(),{padding:[60,60]});
+  } else if(p && lProv){
+    var m2=[];lProv.eachLayer(function(l){if(l.feature.properties.shapeName===p)m2.push(l);});
+    if(m2.length) map.fitBounds(L.featureGroup(m2).getBounds(),{padding:[60,60]});
+  }
+
+  var total=0;
+  if(vis.province && lProv) total+=lProv.getLayers().length;
+  if(vis.district && lDist) total+=lDist.getLayers().length;
+  if(lTeh) total+=lTeh.getLayers().length;
+  document.getElementById('sVisible').textContent=total;
+}
+
+// ── DROPDOWNS ────────────────────────────────────────
+function fillProvinces(){
+  var names=adm1Data.features.map(function(f){return f.properties.shapeName;}).sort();
+  var el=document.getElementById('selProvince');
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
+}
+function fillDistricts(prov){
+  var el=document.getElementById('selDistrict');
+  el.innerHTML='<option value="">— All Districts —</option>';
+  var names=adm2Data.features.filter(function(f){return f.properties.province===prov;}).map(function(f){return f.properties.shapeName;}).sort();
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
+  el.disabled=false;
+}
+function fillTehsils(dist){
+  var el=document.getElementById('selTehsil');
+  if(typeof adm3Data==='undefined'){el.innerHTML='<option>adm3_data.js not found</option>';el.disabled=true;return;}
+  el.innerHTML='<option value="">— All Tehsils —</option>';
+  var names=adm3Data.features.filter(function(f){return f.properties.district===dist;}).map(function(f){return f.properties.shapeName;}).sort();
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
+  el.disabled=false;
+}
+
+// ── FILTER EVENTS ────────────────────────────────────
+document.getElementById('selProvince').addEventListener('change',function(){
+  sel.province=this.value;sel.district='';sel.tehsil='';
+  document.getElementById('selTehsil').innerHTML='<option value="">— Select a District first —</option>';
+  document.getElementById('selTehsil').disabled=true;
+  document.getElementById('tehsilNotice').style.display=this.value?'block':'none';
+  if(this.value){fillDistricts(this.value);}
+  else{var el=document.getElementById('selDistrict');el.innerHTML='<option value="">— Select a Province first —</option>';el.disabled=true;}
+  render();
+});
+document.getElementById('selDistrict').addEventListener('change',function(){
+  sel.district=this.value;sel.tehsil='';
+  document.getElementById('selTehsil').value='';
+  if(this.value){fillTehsils(this.value);}
+  else{var el=document.getElementById('selTehsil');el.innerHTML='<option value="">— Select a District first —</option>';el.disabled=true;}
+  render();
+});
+document.getElementById('selTehsil').addEventListener('change',function(){sel.tehsil=this.value;render();});
+
+function toggleVis(which){
+  if(which==='tehsil' && !sel.district){alert('Please select a District first to view Tehsils.');return;}
+  vis[which]=!vis[which];
+  document.getElementById('lt-'+which).classList.toggle('on',vis[which]);
+  var layer=which==='province'?lProv:which==='district'?lDist:lTeh;
+  if(layer){if(vis[which])layer.addTo(map);else map.removeLayer(layer);}
+}
+
+function resetAll(){
+  sel={province:'',district:'',tehsil:''};
+  document.getElementById('selProvince').value='';
+  document.getElementById('selDistrict').innerHTML='<option value="">— Select a Province first —</option>';document.getElementById('selDistrict').disabled=true;
+  document.getElementById('selTehsil').innerHTML='<option value="">— Select a District first —</option>';document.getElementById('selTehsil').disabled=true;
+  document.getElementById('tehsilNotice').style.display='none';
+  document.getElementById('infoBox').innerHTML='<p class="info-empty">Click any region on the map to inspect its properties.</p>';
+  map.closePopup();
+  map.setView([30.3753,69.3451],5);
+  render();
+}
+
+// ── SHAPE STYLE CONTROLS (pre-draw) ─────────────────
+document.getElementById('dsFillOp').addEventListener('input',function(){
+  drawStyle.fillOpacity=this.value/100;
+  document.getElementById('dsFillOpVal').textContent=this.value+'%';
+});
+document.getElementById('dsWeight').addEventListener('input',function(){
+  drawStyle.weight=+this.value;
+  document.getElementById('dsWeightVal').textContent=this.value+'px';
+});
+document.getElementById('dsStroke').addEventListener('input',function(){ drawStyle.stroke=this.value; });
+document.getElementById('dsFill').addEventListener('input',function(){ drawStyle.fill=this.value; });
+
+document.querySelectorAll('#dsDash .dash-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#dsDash .dash-btn').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+    drawStyle.dash=this.dataset.dash;
+  });
+});
+
+// ── EDIT MODAL CONTROLS ──────────────────────────────
+document.getElementById('emFillOp').addEventListener('input',function(){
+  document.getElementById('emFillOpVal').textContent=this.value+'%';
+});
+document.getElementById('emWeight').addEventListener('input',function(){
+  document.getElementById('emWeightVal').textContent=this.value+'px';
+});
+document.querySelectorAll('#emDash .dash-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#emDash .dash-btn').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+  });
+});
+
+function openEdit(layer){
+  editingLayer=layer;
+  var s=layer._styleData||{stroke:'#c0392b',fill:'#c0392b',fillOpacity:0.35,weight:2,dash:''};
+  document.getElementById('emName').value=s.name||'';
+  document.getElementById('emStroke').value=s.stroke;
+  document.getElementById('emFill').value=s.fill;
+  document.getElementById('emFillOp').value=Math.round(s.fillOpacity*100);
+  document.getElementById('emFillOpVal').textContent=Math.round(s.fillOpacity*100)+'%';
+  document.getElementById('emWeight').value=s.weight;
+  document.getElementById('emWeightVal').textContent=s.weight+'px';
+  // set active dash btn
+  document.querySelectorAll('#emDash .dash-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.dash===s.dash);
+  });
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit(){
+  document.getElementById('editModal').classList.remove('open');
+  editingLayer=null;
+}
+
+function applyEdit(){
+  if(!editingLayer) return;
+  var activeDash='';
+  document.querySelectorAll('#emDash .dash-btn').forEach(function(b){if(b.classList.contains('active')) activeDash=b.dataset.dash;});
+  var s={
+    name:  document.getElementById('emName').value.trim(),
+    stroke:document.getElementById('emStroke').value,
+    fill:  document.getElementById('emFill').value,
+    fillOpacity: document.getElementById('emFillOp').value/100,
+    weight:+document.getElementById('emWeight').value,
+    dash:  activeDash
+  };
+  editingLayer._styleData=s;
+  // Markers have no setStyle
+  if(editingLayer.setStyle){
+    editingLayer.setStyle(buildShapeStyle(s));
+  }
+  var lt=editingLayer._drawType||'shape';
+  editingLayer.setPopupContent(buildDrawnPopup(s,lt));
+  showToast('✅ Style applied!');
+  closeEdit();
+}
+
+// ── DRAW COUNT / DOWNLOAD ────────────────────────────
+function updateDrawUI(){
+  document.getElementById('drawCount').textContent=drawnCount;
+  document.getElementById('btnDownload').disabled=drawnCount===0;
+}
+
+function clearDrawn(){
+  drawnItems.clearLayers();
+  drawnCount=0;
+  closeEdit();
+  updateDrawUI();
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2800);
+}
+
+function downloadGeoJSON(){
+  var layers=drawnItems.getLayers();
+  if(!layers.length){showToast('⚠️ No shapes to export.');return;}
+  var features=layers.map(function(layer,idx){
+    var geom,props;
+    var s=layer._styleData||{stroke:'#c0392b',fill:'#c0392b',fillOpacity:0.35,weight:2,dash:''};
+    var dashLabel=s.dash===''?'solid':s.dash==='8,4'?'dashed':s.dash==='2,4'?'dotted':'dash-dot';
+    var baseProps={
+      id:idx+1,
+      name:s.name||'',
+      stroke:s.stroke,
+      fill:s.fill,
+      fill_opacity:s.fillOpacity,
+      stroke_width:s.weight,
+      line_style:dashLabel
+    };
+    if(layer instanceof L.Circle){
+      geom={type:'Point',coordinates:[layer.getLatLng().lng,layer.getLatLng().lat]};
+      props=Object.assign({},baseProps,{type:'Circle',radius_m:Math.round(layer.getRadius())});
+    } else {
+      geom=layer.toGeoJSON?layer.toGeoJSON().geometry:null;
+      var type=layer instanceof L.Marker?'Marker':layer instanceof L.Rectangle?'Rectangle':layer instanceof L.Polygon?'Polygon':layer instanceof L.Polyline?'Polyline':'Shape';
+      props=Object.assign({},baseProps,{type:type});
+    }
+    return geom?{type:'Feature',properties:props,geometry:geom}:null;
+  }).filter(Boolean);
+
+  var fc={type:'FeatureCollection',features:features};
+  var blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='drawn_shapes_'+new Date().toISOString().slice(0,10)+'.geojson';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('✅ '+features.length+' shape'+(features.length!==1?'s':'')+' exported!');
+}
+
+// ── INIT ─────────────────────────────────────────────
+window.addEventListener('load',function(){
+  map=L.map('map',{center:[30.3753,69.3451],zoom:5});
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19
+  }).addTo(map);
+
+  map.on('mousemove',function(e){
+    document.getElementById('coords').textContent=e.latlng.lat.toFixed(4)+'° N  '+e.latlng.lng.toFixed(4)+'° E';
+  });
+
+  // Close edit if clicking on map (not on drawn shape)
+  map.on('click',function(){ closeEdit(); });
+
+  drawnItems=new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  var drawCtrl=new L.Control.Draw({
+    edit:{featureGroup:drawnItems},
+    draw:{
+      marker:true,
+      polyline: {shapeOptions:{color:drawStyle.stroke,weight:drawStyle.weight}},
+      polygon:  {shapeOptions:{color:drawStyle.stroke,fillColor:hexToRgba(drawStyle.fill,drawStyle.fillOpacity),weight:drawStyle.weight}},
+      rectangle:{shapeOptions:{color:drawStyle.stroke,fillColor:hexToRgba(drawStyle.fill,drawStyle.fillOpacity),weight:drawStyle.weight}},
+      circle:   {shapeOptions:{color:drawStyle.stroke,fillColor:hexToRgba(drawStyle.fill,drawStyle.fillOpacity),weight:drawStyle.weight}},
+    }
+  });
+  map.addControl(drawCtrl);
+
+  map.on(L.Draw.Event.CREATED,function(e){
+    var layer=e.layer;
+    var lt=e.layerType;
+    // Capture style snapshot at draw time
+    var s={
+      name: document.getElementById('dsName').value.trim(),
+      stroke:drawStyle.stroke,fill:drawStyle.fill,
+      fillOpacity:drawStyle.fillOpacity,weight:drawStyle.weight,dash:drawStyle.dash
+    };
+    layer._styleData=s;
+    layer._drawType=lt;
+    // Apply style (markers don't support setStyle)
+    if(layer.setStyle) layer.setStyle(buildShapeStyle(s));
+    layer.bindPopup(buildDrawnPopup(s,lt));
+    // Click on drawn shape → open edit modal
+    layer.on('click',function(e){
+      L.DomEvent.stopPropagation(e);
+      openEdit(layer);
+    });
+    drawnItems.addLayer(layer);
+    drawnCount++;
+    updateDrawUI();
+  });
+
+  map.on(L.Draw.Event.DELETED,function(e){
+    drawnCount=Math.max(0,drawnCount-Object.keys(e.layers._layers).length);
+    updateDrawUI();
+  });
+
+  fillProvinces();
+  render();
+});
+</script>
+</body>
+</html>
